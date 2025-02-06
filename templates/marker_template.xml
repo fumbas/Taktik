@@ -1,0 +1,6 @@
+<mxCell id="{id}" value="" style="edgeStyle=none;endArrow=none;strokeWidth=3;strokeColor={color};" edge="1" parent="1">
+    <mxGeometry relative="1" as="geometry">
+        <mxPoint x="{x1}" y="{y1}" as="sourcePoint"/>
+        <mxPoint x="{x2}" y="{y2}" as="targetPoint"/>
+    </mxGeometry>
+</mxCell>
