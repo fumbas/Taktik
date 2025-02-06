@@ -11,15 +11,15 @@ import zlib
 import urllib.parse
 import webbrowser
 
-# Spielfeld-Größe in Metern
+# Field size in meters
 FIELD_WIDTH_M = 37
 FIELD_HEIGHT_M = 100
 
-# Spieler & Scheibe in Pixeln
+# Player & disc in pixels
 PLAYER_RADIUS = 15
 DISC_RADIUS = 10
 
-# Skalierungsfaktor für Draw.io (1m = 10px)
+# Scaling factor for Draw.io (1m = 10px)
 SCALE = 10
 
 # Templates
@@ -34,36 +34,36 @@ TEMPLATES = {
 
 
 def load_yaml(file_path):
-    """ Lädt die Formation aus einer YAML-Datei. """
+    """ Loads the formation from a YAML file. """
     with open(file_path, "r") as f:
         return yaml.safe_load(f)
 
 
 def add_element(root, element_template, data):
-    """ Fügt ein Element in die XML-Struktur ein. """
+    """ Adds an element to the XML structure. """
     element = element_template.format(**data)
     root.append(ET.fromstring(element))
 
 
 def scale_position(x, y):
-    """ Skaliert eine Position vom Meter- in den Pixelbereich. """
+    """ Scales a position from meters to pixels. """
     return x * SCALE, (FIELD_HEIGHT_M - y) * SCALE
 
 
 def calculate_player_positions(x, y):
-    """ Berechnet die obere linke Ecke eines Spielers basierend auf der Mittelposition. """
+    """ Calculates the top-left corner of a player based on the center position. """
     x_scaled, y_scaled = scale_position(x, y)
     return x_scaled - PLAYER_RADIUS, y_scaled - PLAYER_RADIUS
 
 
 def calculate_disc_positions(x, y):
-    """ Berechnet die obere linke Ecke der Scheibe basierend auf der Mittelposition. """
+    """ Calculates the top-left corner of the disc based on the center position. """
     x_scaled, y_scaled = scale_position(x, y)
     return x_scaled - DISC_RADIUS, y_scaled - DISC_RADIUS
 
 
 def calculate_marker_positions(x, y, angle_deg, length=30, radius=20):
-    """ Berechnet die Start- und Endpunkte eines Markers mit fester Länge (30px), gedreht um den Mittelpunkt. """
+    """ Calculates the start and end points of a marker with a fixed length (30px), rotated around the center. """
     angle_rad = math.radians(angle_deg - 90)
 
     tangent_angle_rad = math.radians(angle_deg)
@@ -80,7 +80,7 @@ def calculate_marker_positions(x, y, angle_deg, length=30, radius=20):
 
 
 def generate_diagram(yaml_file):
-    """ Erzeugt eine .drawio-Datei mit Spielern, Scheibe, Cones und Markern aus einer YAML Konfiguration. """
+    """ Generates a .drawio file with players, disc, cones, and markers from a YAML configuration. """
     
     formation = load_yaml(yaml_file)
     export_type = formation["export"]["export_type"]
@@ -98,7 +98,7 @@ def generate_diagram(yaml_file):
 
     templates = {key: open(TEMPLATES[key]).read() for key in TEMPLATES}
 
-    # Spieler hinzufügen
+    # Add players
     for idx, player in enumerate(formation["players"], start=10):
         x, y = calculate_player_positions(player["x"], player["y"])
         color = team_colors.get(player["team"], "#000000")
@@ -106,7 +106,7 @@ def generate_diagram(yaml_file):
         player_data = {"id": idx, "name": player["name"], "x": str(x), "y": str(y), "color": color}
         add_element(root, templates["player"], player_data)
 
-        # Laufwege
+        # Paths
         previous_x, previous_y = x, y
 
         for path_idx, path_point in enumerate(player.get("path", []), start=1):
@@ -115,7 +115,7 @@ def generate_diagram(yaml_file):
             elif "dx" in path_point and "dy" in path_point:
                 path_x, path_y = previous_x + path_point["dx"] * SCALE, previous_y - path_point["dy"] * SCALE
             else:
-                raise ValueError(f"Path-Eintrag {path_point} ist ungültig!")
+                raise ValueError(f"Path entry {path_point} is invalid!")
 
             faded_color = color + "7F"
             player_data_faded = {
@@ -127,7 +127,7 @@ def generate_diagram(yaml_file):
             }
             add_element(root, templates["player"], player_data_faded)
 
-            # Pfeil
+            # Arrow
             arrow_data = {
                 "id": f"arrow_{idx}_{path_idx}",
                 "x1": str(previous_x + PLAYER_RADIUS),
@@ -139,7 +139,7 @@ def generate_diagram(yaml_file):
 
             previous_x, previous_y = path_x, path_y
 
-    # Scheibe hinzufügen + Passwege
+    # Add disc + paths
     x, y = calculate_disc_positions(formation["disc"]["x"], formation["disc"]["y"])
     color = team_colors["disc"]
     disc_data = {
@@ -158,7 +158,7 @@ def generate_diagram(yaml_file):
         elif "dx" in path_point and "dy" in path_point:
             path_x, path_y = previous_x + path_point["dx"] * SCALE, previous_y - path_point["dy"] * SCALE
         else:
-            raise ValueError(f"Path-Eintrag {path_point} ist ungültig!")
+            raise ValueError(f"Path entry {path_point} is invalid!")
 
         faded_color = color + "7F"
         disc_data_faded = {
@@ -169,7 +169,7 @@ def generate_diagram(yaml_file):
         }
         add_element(root, templates["disc"], disc_data_faded)
 
-        # Pfeil
+        # Arrow
         arrow_data = {
             "id": f"disc_arrow_{idx}",
             "x1": str(previous_x + DISC_RADIUS),
@@ -180,7 +180,7 @@ def generate_diagram(yaml_file):
 
         previous_x, previous_y = path_x, path_y
 
-    # Marker hinzufügen
+    # Add markers
     for idx, marker in enumerate(formation.get("markers", []), start=100):
         x, y = scale_position(marker["x"], marker["y"])
         x1, y1, x2, y2 = calculate_marker_positions(x, y, marker["rotation"])
@@ -195,17 +195,17 @@ def generate_diagram(yaml_file):
         }
         add_element(root, templates["marker"], marker_data)
 
-    # Cones hinzufügen
+    # Add cones
     for idx, cone in enumerate(formation.get("cones", []), start=200):
         x, y = scale_position(cone["x"], cone["y"])
         cone_data = {"id": idx, "x": str(x), "y": str(y), "color": team_colors["cone"]}
         add_element(root, templates["cone"], cone_data)
 
-    # Export-Verzeichnis erstellen
+    # Create export directory
     output_dir = os.path.join(os.getcwd(), export_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Speichern & Export
+    # Save & export
     base_output_file = os.path.join(output_dir, export_name)
     output_file = os.path.join(output_dir, f"{export_name}.drawio")
     counter = 1
@@ -214,9 +214,9 @@ def generate_diagram(yaml_file):
         counter += 1
 
     tree.write(output_file, encoding="utf-8", xml_declaration=True)
-    print(f"Drawio wurde erstellt: {output_file}")
+    print(f"Drawio created: {output_file}")
 
-    # Export & Bildbearbeitung
+    # Export & image processing
     export_file = os.path.join(output_dir, f"{export_name}.{export_type}")
     counter = 1
     while os.path.exists(export_file):
@@ -233,15 +233,15 @@ def generate_diagram(yaml_file):
 def export_with_drawio(input_file, output_file, export_type, border=50):
     try:
         subprocess.run(["drawio", "-x", "-f", export_type, "-o", output_file, "--border", str(border), input_file], check=True)
-        print(f"Diagramm erfolgreich exportiert als {output_file}")
+        print(f"Diagram successfully exported as {output_file}")
     except FileNotFoundError:
-        print("Fehler: Draw.io CLI nicht gefunden!")
+        print("Error: Draw.io CLI not found!")
     except subprocess.CalledProcessError:
-        print("Fehler beim Export mit Draw.io CLI.")
+        print("Error exporting with Draw.io CLI.")
 
 
 def extract_mxfile_from_drawio(drawio_file):
-    """ Extrahiert das `<mxfile>`-Element aus einer `.drawio`-Datei. """
+    """ Extracts the `<mxfile>` element from a `.drawio` file. """
     tree = ET.parse(drawio_file)
     root = tree.getroot()
 
@@ -251,10 +251,10 @@ def extract_mxfile_from_drawio(drawio_file):
 
 def generate_diagram_link(drawio_file):
     """
-    Erstellt eine Draw.io-URL mit komprimiertem und base64-kodiertem XML.
+    Creates a Draw.io URL with compressed and base64-encoded XML.
     
-    :param drawio_file: Der Pfad zur .drawio-Datei
-    :return: Eine vollständige Viewer-URL für Draw.io
+    :param drawio_file: The path to the .drawio file
+    :return: A complete viewer URL for Draw.io
     """
     xml_content = extract_mxfile_from_drawio(drawio_file)
     if not xml_content:
@@ -262,7 +262,7 @@ def generate_diagram_link(drawio_file):
 
     xml_content = xml_content.replace("\n", "").replace("\r", "").strip()
 
-    compressed_data = zlib.compress(xml_content.encode("utf-8"))[2:-4]  # Entfernt den Header (2 Byte) & Footer (4 Byte)
+    compressed_data = zlib.compress(xml_content.encode("utf-8"))[2:-4]  # Removes the header (2 bytes) & footer (4 bytes)
 
     xml_encoded = base64.b64encode(compressed_data).decode("utf-8")
 
@@ -273,19 +273,15 @@ def generate_diagram_link(drawio_file):
     return drawio_url
 
 def open_diagram_in_browser(drawio_file):
-    """
-    Öffnet das generierte Diagramm direkt im Browser.
-    
-    :param drawio_file: Der Pfad zur .drawio-Datei
-    """
+    """ Opens the generated diagram directly in the browser. """
     url = generate_diagram_link(drawio_file)
     if url:
-        print(f"Öffne Diagramm im Browser: {url}")
+        print(f"Opening diagram in browser: {url}")
         webbrowser.open(url)
 
 
 def process_image(image_path, scale_factor=1.0, orientation="portrait"):
-    """ Skaliert und dreht das Bild nach dem Export. """
+    """ Scales and rotates the image after export. """
     try:
         img = Image.open(image_path)
 
@@ -297,15 +293,15 @@ def process_image(image_path, scale_factor=1.0, orientation="portrait"):
             img = img.resize((new_width, new_height), Image.ANTIALIAS)
 
         img.save(image_path)
-        print(f"Bildbearbeitung abgeschlossen: {image_path} ({img.width}x{img.height}px)")
+        print(f"Image processing completed: {image_path} ({img.width}x{img.height}px)")
     
     except Exception as e:
-        print(f"Fehler bei der Bildbearbeitung: {e}")
+        print(f"Error processing image: {e}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Fehler: Bitte eine YAML-Datei angeben!")
+        print("Error: Please specify a YAML file!")
         sys.exit(1)
 
     yaml_file = sys.argv[1]
