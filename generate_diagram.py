@@ -1,5 +1,4 @@
 import os
-import platform
 import xml.etree.ElementTree as ET
 import yaml
 import subprocess
