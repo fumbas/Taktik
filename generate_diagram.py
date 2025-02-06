@@ -1,4 +1,5 @@
 import os
+import platform
 import xml.etree.ElementTree as ET
 import yaml
 import subprocess
@@ -34,8 +35,37 @@ TEMPLATES = {
 
 def load_yaml(file_path):
     """ Loads the formation from a YAML file. """
-    with open(file_path, "r") as f:
-        return yaml.safe_load(f)
+    try:
+        with open(file_path, "r") as f:
+            return yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        print(f"Error loading YAML file: {e}")
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"Error: YAML file '{file_path}' not found!")
+        sys.exit(1)
+
+
+def validate_formation(formation):
+    """ Validates the formation data from the YAML file. """
+    required_keys = ["export", "players", "disc"]
+    for key in required_keys:
+        if key not in formation:
+            print(f"Error: Missing required key '{key}' in formation!")
+            sys.exit(1)
+
+    if "export_type" not in formation["export"] or "export_name" not in formation["export"]:
+        print("Error: Missing 'export_type' or 'export_name' in export settings!")
+        sys.exit(1)
+
+    for player in formation["players"]:
+        if "name" not in player or "team" not in player or "x" not in player or "y" not in player:
+            print(f"Error: Missing required player attributes in {player}!")
+            sys.exit(1)
+
+    if "x" not in formation["disc"] or "y" not in formation["disc"]:
+        print("Error: Missing 'x' or 'y' in disc settings!")
+        sys.exit(1)
 
 
 def add_element(root, element_template, data):
@@ -82,6 +112,8 @@ def generate_diagram(yaml_file):
     """ Generates a .drawio file with players, disc, cones, and markers from a YAML configuration. """
     
     formation = load_yaml(yaml_file)
+    validate_formation(formation)
+
     export_type = formation["export"]["export_type"]
     export_name = formation["export"]["export_name"]
 
@@ -114,7 +146,8 @@ def generate_diagram(yaml_file):
             elif "dx" in path_point and "dy" in path_point:
                 path_x, path_y = previous_x + path_point["dx"] * SCALE, previous_y - path_point["dy"] * SCALE
             else:
-                raise ValueError(f"Path entry {path_point} is invalid!")
+                print(f"Error: Invalid path entry {path_point} for player {player['name']}!")
+                sys.exit(1)
 
             faded_color = color + "7F"
             player_data_faded = {
@@ -157,7 +190,8 @@ def generate_diagram(yaml_file):
         elif "dx" in path_point and "dy" in path_point:
             path_x, path_y = previous_x + path_point["dx"] * SCALE, previous_y - path_point["dy"] * SCALE
         else:
-            raise ValueError(f"Path entry {path_point} is invalid!")
+            print(f"Error: Invalid path entry {path_point} for disc!")
+            sys.exit(1)
 
         faded_color = color + "7F"
         disc_data_faded = {
@@ -181,6 +215,9 @@ def generate_diagram(yaml_file):
 
     # Add markers
     for idx, marker in enumerate(formation.get("markers", []), start=100):
+        if "x" not in marker or "y" not in marker or "rotation" not in marker:
+            print(f"Error: Missing required marker attributes in {marker}!")
+            sys.exit(1)
         x, y = scale_position(marker["x"], marker["y"])
         x1, y1, x2, y2 = calculate_marker_positions(x, y, marker["rotation"])
 
@@ -196,6 +233,9 @@ def generate_diagram(yaml_file):
 
     # Add cones
     for idx, cone in enumerate(formation.get("cones", []), start=200):
+        if "x" not in cone or "y" not in cone:
+            print(f"Error: Missing required cone attributes in {cone}!")
+            sys.exit(1)
         x, y = scale_position(cone["x"], cone["y"])
         cone_data = {"id": idx, "x": str(x), "y": str(y), "color": team_colors["cone"]}
         add_element(root, templates["cone"], cone_data)
@@ -230,6 +270,7 @@ def generate_diagram(yaml_file):
 
 
 def export_with_drawio(input_file, output_file, export_type, border=50):
+    """ Exports the diagram using the Draw.io CLI. """
     try:
         subprocess.run(["drawio", "-x", "-f", export_type, "-o", output_file, "--border", str(border), input_file], check=True)
         print(f"Diagram successfully exported as {output_file}")
@@ -241,19 +282,21 @@ def export_with_drawio(input_file, output_file, export_type, border=50):
 
 def extract_mxfile_from_drawio(drawio_file):
     """ Extracts the `<mxfile>` element from a `.drawio` file. """
-    tree = ET.parse(drawio_file)
-    root = tree.getroot()
+    try:
+        tree = ET.parse(drawio_file)
+        root = tree.getroot()
 
-    mxfile_content = ET.tostring(root, encoding="utf-8", method="xml").decode("utf-8")
-    
-    return mxfile_content
+        mxfile_content = ET.tostring(root, encoding="utf-8", method="xml").decode("utf-8")
+        
+        return mxfile_content
+    except ET.ParseError as e:
+        print(f"Error parsing .drawio file: {e}")
+        return None
+
 
 def generate_diagram_link(drawio_file):
     """
     Creates a Draw.io URL with compressed and base64-encoded XML.
-    
-    :param drawio_file: The path to the .drawio file
-    :return: A complete viewer URL for Draw.io
     """
     xml_content = extract_mxfile_from_drawio(drawio_file)
     if not xml_content:
@@ -271,8 +314,9 @@ def generate_diagram_link(drawio_file):
 
     return drawio_url
 
+
 def open_diagram_in_browser(drawio_file):
-    """ Opens the generated diagram directly in the browser. """
+    """ Opens the generated diagram directly in the browser.    """
     url = generate_diagram_link(drawio_file)
     if url:
         print(f"Opening diagram in browser: {url}")
