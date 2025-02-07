@@ -1,5 +1,4 @@
 import os
-import platform
 import xml.etree.ElementTree as ET
 import yaml
 import subprocess
@@ -12,12 +11,12 @@ import urllib.parse
 import webbrowser
 
 # Field size in meters
-FIELD_WIDTH_M = 37
-FIELD_HEIGHT_M = 100
+FIELD_WIDTH_M = 0 # to be configured in load_pitch_dimensions()
+FIELD_HEIGHT_M = 0 # to be configured in load_pitch_dimensions()
 
 # Player & disc in pixels
-PLAYER_RADIUS = 15
-DISC_RADIUS = 10
+PLAYER_RADIUS = 0 # to be configured in load_pitch_dimensions()
+DISC_RADIUS = 0 # to be configured in load_pitch_dimensions()
 
 # Scaling factor for Draw.io (1m = 10px)
 SCALE = 10
@@ -27,7 +26,7 @@ TEMPLATES = {
     "player": "templates/player_template.xml",
     "disc": "templates/disc.xml",
     "marker": "templates/marker_template.xml",
-    "pitch": "templates/pitch.xml",
+    "pitch": "templates/pitch_indoor.xml",
     "cone": "templates/cone_template.xml",
     "arrow": "templates/arrow_template.xml"
 }
@@ -48,11 +47,15 @@ def load_yaml(file_path):
 
 def validate_formation(formation):
     """ Validates the formation data from the YAML file. """
-    required_keys = ["export", "players", "disc"]
+    required_keys = ["export", "field"]
     for key in required_keys:
         if key not in formation:
             print(f"Error: Missing required key '{key}' in formation!")
             sys.exit(1)
+
+    if "type" not in formation["field"]:
+        print("Error: Missing 'type' in field settings!")
+        sys.exit(1)
 
     if "export_type" not in formation["export"] or "export_name" not in formation["export"]:
         print("Error: Missing 'export_type' or 'export_name' in export settings!")
@@ -65,6 +68,30 @@ def validate_formation(formation):
 
     if "x" not in formation["disc"] or "y" not in formation["disc"]:
         print("Error: Missing 'x' or 'y' in disc settings!")
+        sys.exit(1)
+
+
+def load_pitch_dimensions():
+    """ Lädt die Feldabmessungen aus der pitch.xml Vorlage. """
+    global FIELD_WIDTH_M, FIELD_HEIGHT_M, SCALE, PLAYER_RADIUS, DISC_RADIUS
+    try:
+        tree = ET.parse(TEMPLATES["pitch"])
+        root = tree.getroot()
+        graph_model = root.find(".//mxGraphModel")
+        page_width = int(graph_model.get("pageWidth"))
+        page_height = int(graph_model.get("pageHeight"))
+        FIELD_WIDTH_M = page_width / SCALE
+        FIELD_HEIGHT_M = page_height / SCALE
+
+        # PLAYER_RADIUS = FIELD_HEIGHT_M / 70 * SCALE
+        # DISC_RADIUS = FIELD_HEIGHT_M / 100 * SCALE
+
+        print(f"Loaded pitch dimensions: FIELD_WIDTH_M={FIELD_WIDTH_M}, FIELD_HEIGHT_M={FIELD_HEIGHT_M}, PLAYER_RADIUS={PLAYER_RADIUS}, DISC_RADIUS={DISC_RADIUS}")
+    except ET.ParseError as e:
+        print(f"Error parsing pitch template: {e}")
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"Error: Pitch template '{TEMPLATES['pitch']}' not found!")
         sys.exit(1)
 
 
@@ -91,15 +118,16 @@ def calculate_disc_positions(x, y):
     return x_scaled - DISC_RADIUS, y_scaled - DISC_RADIUS
 
 
-def calculate_marker_positions(x, y, angle_deg, length=30, radius=20):
-    """ Calculates the start and end points of a marker with a fixed length (30px), rotated around the center. """
+def calculate_marker_positions(x, y, angle_deg):
+    """ Calculates the start and end points of a marker with a fixed length , rotated around the center. """
     angle_rad = math.radians(angle_deg - 90)
+    marker_radius = PLAYER_RADIUS * 1.5
 
     tangent_angle_rad = math.radians(angle_deg)
-    x_m = x + radius * math.cos(angle_rad)
-    y_m = y + radius * math.sin(angle_rad)
+    x_m = x + marker_radius * math.cos(angle_rad)
+    y_m = y + marker_radius * math.sin(angle_rad)
 
-    half_length = length / 2
+    half_length = PLAYER_RADIUS
     x1 = x_m - half_length * math.cos(tangent_angle_rad)
     y1 = y_m - half_length * math.sin(tangent_angle_rad)
     x2 = x_m + half_length * math.cos(tangent_angle_rad)
@@ -113,6 +141,19 @@ def generate_diagram(yaml_file):
     
     formation = load_yaml(yaml_file)
     validate_formation(formation)
+
+    if formation["field"]["type"] == "indoor":
+        TEMPLATES["pitch"] = "templates/pitch_indoor.xml"
+        PLAYER_RADIUS = 10
+        DISC_RADIUS = 7.5
+    elif formation["field"]["type"] == "outdoor":
+        TEMPLATES["pitch"] = "templates/pitch_outdoor.xml"
+        PLAYER_RADIUS = 15
+        DISC_RADIUS = 10
+
+    load_pitch_dimensions()
+
+    load_pitch_dimensions()
 
     export_type = formation["export"]["export_type"]
     export_name = formation["export"]["export_name"]
@@ -134,7 +175,14 @@ def generate_diagram(yaml_file):
         x, y = calculate_player_positions(player["x"], player["y"])
         color = team_colors.get(player["team"], "#000000")
 
-        player_data = {"id": idx, "name": player["name"], "x": str(x), "y": str(y), "color": color}
+        player_data = {
+            "id": idx,
+            "name": player["name"],
+            "x": str(x),
+            "y": str(y),
+            "color": color,
+            "size": str(2 * PLAYER_RADIUS)
+        }
         add_element(root, templates["player"], player_data)
 
         # Paths
@@ -155,7 +203,8 @@ def generate_diagram(yaml_file):
                 "name": player["name"],
                 "x": str(path_x),
                 "y": str(path_y), 
-                "color": faded_color
+                "color": faded_color,
+                "size": str(2 * PLAYER_RADIUS)
             }
             add_element(root, templates["player"], player_data_faded)
 
@@ -171,19 +220,21 @@ def generate_diagram(yaml_file):
 
             previous_x, previous_y = path_x, path_y
 
-    # Add disc + paths
+    # Add disc
     x, y = calculate_disc_positions(formation["disc"]["x"], formation["disc"]["y"])
     color = team_colors["disc"]
     disc_data = {
         "id": "99",
         "x": str(x),
         "y": str(y),
-        "color": color
+        "color": color,
+        "size": str(2 * DISC_RADIUS)
     }
     add_element(root, templates["disc"], disc_data)
 
     previous_x, previous_y = x, y
 
+    # path
     for idx, path_point in enumerate(formation["disc"].get("path", []), start=1):
         if "x" in path_point and "y" in path_point:
             path_x, path_y = calculate_disc_positions(path_point["x"], path_point["y"])
@@ -198,7 +249,8 @@ def generate_diagram(yaml_file):
             "id": f"disc_{idx}",
             "x": str(path_x),
             "y": str(path_y),
-            "color": faded_color
+            "color": faded_color,
+            "size": str(2 * DISC_RADIUS)
         }
         add_element(root, templates["disc"], disc_data_faded)
 
@@ -237,7 +289,13 @@ def generate_diagram(yaml_file):
             print(f"Error: Missing required cone attributes in {cone}!")
             sys.exit(1)
         x, y = scale_position(cone["x"], cone["y"])
-        cone_data = {"id": idx, "x": str(x), "y": str(y), "color": team_colors["cone"]}
+        cone_data = {
+            "id": idx,
+            "x": str(x),
+            "y": str(y),
+            "color": team_colors["cone"],
+            "size": str(PLAYER_RADIUS)
+        }
         add_element(root, templates["cone"], cone_data)
 
     # Create export directory

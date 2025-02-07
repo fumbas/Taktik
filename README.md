@@ -31,6 +31,11 @@ python3 generate_diagram.py path/to/your/formation.yaml
   - `export_type`: The format to export (e.g., `png`, `pdf`, `svg`, `web`)
     - Use `png`, `pdf`, `svg` if you have drawio installed locally. Otherwise choose `web`.
   - `export_name`: The base name for the export file
+  - `orientation`: `landscape` or `portrait`
+  - `scale_factor`: value `<1` to make the resulting export smaller
+
+- `field`
+  - `type`: `outdoor` or `indoor`
 
 - `colors`: Team colors
   - `offense`: Color for the offense team
