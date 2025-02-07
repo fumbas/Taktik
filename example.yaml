@@ -1,0 +1,57 @@
+export:
+  export_type: png      # png, svg, pdf, web - use web if Draw.io is not installed locally
+  export_name: example  # name of the exported file
+  scale_factor: 1       # scale factor of the exported diagram
+  orientation: portrait # portrait or landscape
+
+field:
+  type: outdoor         # indoor or outdoor
+
+colors:                 # colors of the players, disc, markers and cones
+  offense: "#1E90FF"
+  defense: "#FF4500"
+  disc: "#FFD700"
+  marker: "#000000"
+  cone: "#FFA500"
+
+players:                # list of players
+  - name: H1
+    x: 6              # x-coordinate in meters (0,0) is the bottom left corner
+    y: 30              # y-coordinate in meters
+    team: offense     # offense or defense
+
+  - name: C1
+    x: 20
+    y: 47
+    team: offense
+    path:             # path of the player
+      - dx: -4        # change of x-coordinate in meters
+        dy: 0        # change of y-coordinate in meters
+      - x: 13          # new absolute x-coordinate in meters
+        y: 57          # new absolute y-coordinate in meters
+      - dx: -2
+        dy: -13
+
+  - name: D1
+    x: 9
+    y: 60
+    team: defense
+
+
+markers:                # list of markers
+  - x: 6                # x-coordinate in meters
+    y: 30                # y-coordinate in meters
+    rotation: 100       # rotation in degrees (0 is pointing to the top)
+
+disc:                   # position of the disc
+  x: 6.3                # x-coordinate in meters
+  y: 30.3                # y-coordinate in meters
+  path:                 # path of the disc
+    - x: 10             # change of x-coordinate in meters
+      y: 42           # change of y-coordinate in meters
+
+cones:                  # list of cones
+  - x: 20                # x-coordinate in meters
+    y: 45                # y-coordinate in meters
+  - x: 17
+    y: 45
