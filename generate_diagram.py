@@ -120,6 +120,7 @@ def calculate_disc_positions(x, y):
 
 def calculate_marker_positions(x, y, angle_deg):
     """ Calculates the start and end points of a marker with a fixed length , rotated around the center. """
+    
     angle_rad = math.radians(angle_deg - 90)
     marker_radius = PLAYER_RADIUS * 1.5
 
@@ -138,7 +139,7 @@ def calculate_marker_positions(x, y, angle_deg):
 
 def generate_diagram(yaml_file):
     """ Generates a .drawio file with players, disc, cones, and markers from a YAML configuration. """
-    
+    global PLAYER_RADIUS, DISC_RADIUS
     formation = load_yaml(yaml_file)
     validate_formation(formation)
 
@@ -150,8 +151,6 @@ def generate_diagram(yaml_file):
         TEMPLATES["pitch"] = "templates/pitch_outdoor.xml"
         PLAYER_RADIUS = 15
         DISC_RADIUS = 10
-
-    load_pitch_dimensions()
 
     load_pitch_dimensions()
 
