@@ -4,4 +4,6 @@
 *.pdf
 *.svg
 
+TaktikJava/*
+
 !example.*
