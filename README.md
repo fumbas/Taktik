@@ -65,3 +65,5 @@ python3 generate_diagram.py path/to/your/formation.yaml
   - `x`: X-coordinate in meters
   - `y`: Y-coordinate in meters
 
+### Example included in /example/
+
